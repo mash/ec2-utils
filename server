@@ -1,0 +1,39 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use Config::Pit;
+use Net::Amazon::EC2;
+use Getopt::Long;
+my ($result, $pit, $region);
+$region = 'us-west-1';
+$result = GetOptions ( "pit|p=s"    => \$pit,
+                       "region|r:s" => \$region)
+    or die usage();
+
+my $group_id = shift @ARGV
+    or die usage();
+
+$pit
+    or die usage();
+
+my $config = pit_get( $pit, require => {
+    AWSAccessKeyId  => 'access key id',
+    SecretAccessKey => 'secret access key',
+});
+
+my $ec2 = Net::Amazon::EC2->new(
+    AWSAccessKeyId  => $config->{AWSAccessKeyId},
+    SecretAccessKey => $config->{SecretAccessKey},
+    region          => $region,
+);
+
+my $instances = $ec2->describe_instances;
+my @running_instances = grep { $_->instances_set->[0]->instance_state->name eq 'running' } @{ $instances };
+my @group_instances   = grep { $_->group_set->[0]->group_id eq $group_id } @running_instances;
+
+my $publicdns_name    = $group_instances[0]->instances_set->[0]->dns_name;
+print $publicdns_name;
+
+sub usage {
+    "usage: $0 -p <pit_key> -r 'us-west-1' <group_id>";
+}
